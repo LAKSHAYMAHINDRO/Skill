@@ -1,0 +1,43 @@
+from pyspark.sql import *
+from pyspark.sql.functions import *
+from pyspark.sql.types import *
+
+
+spark = SparkSession.builder.appName("DataCleaning").getOrCreate()
+
+
+df = spark.read.csv("Sales Data.csv", header=True, inferSchema=True)
+
+
+df.show()
+
+df.printSchema()
+
+
+df.select(
+    [count(when(col(c).isNull() | isnan(c), c)).alias(c) for c in df.columns]).show()
+
+numerical_columns = ['Sales']
+for col_name in numerical_columns:
+    mean_value = df.select(mean(col_name)).collect()[0][0]
+    df = df.fillna({col_name: mean_value})
+
+
+df = df.dropna()
+df.show()
+
+df = df.dropDuplicates()
+df.show()
+
+
+df = df.withColumn("Sales", col("Sales").cast("float"))
+df = df.withColumn("Quantity Ordered", col("Quantity Ordered").cast("integer"))
+df = df.withColumn("Price Each", col("Price Each").cast("float"))
+df.printSchema()
+
+columns_to_check = ['Sales', 'Price Each', 'Quantity Ordered']
+for col_name in columns_to_check:
+    df = df.filter(col(col_name) >= 0)
+    df.show()
+
+df.groupBy("Product").sum("Sales").withColumnRenamed("sum(Sales)", "Total Sales").show()

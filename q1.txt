@@ -1,0 +1,43 @@
+from pyspark.sql import *
+from pyspark.sql.functions import *
+from pyspark.sql.types import *
+
+spark = SparkSession.builder.appName("Emp").getOrCreate()
+
+emp = spark.read.csv("emp_data.csv",header=True,inferSchema=True)
+emp.show()
+
+missing_counts = emp.select([count(when(col(c).isNull() | isnan(c), c)).alias(c) for c in emp.columns])
+missing_counts.show()
+
+emps = emp.fillna({"LastName": "Unknown"})
+emps.show()
+
+emp = emps.dropna(subset=["EmpID", "StartDate"])
+emp.show()
+
+emp = emp.withColumn("Current Employee Rating",when(col("Current Employee Rating")<1,1).when(col("Current Employee Rating")>5,5).otherwise("Current Employee Rating"))
+emp.show()
+
+emp.select("LocationCode").distinct().show()
+
+df = emp.dropDuplicates()
+df.show()
+
+df =df.groupBy("DepartmentType","Title").count().orderBy("DepartmentType","Title")
+df.show()
+
+df = emp.withColumn(
+    "Performance Score",
+    when(col("Performance Score") == "Exceeds", 3)
+    .when(col("Performance Score") == "Fully Meets", 2)
+    .when(col("Performance Score") == "Needs Improvement", 1)
+    .otherwise(0)
+)
+highest_perf = (
+    df.orderBy("DepartmentType", col("Performance Score").desc())
+    .dropDuplicates(["DepartmentType"])
+    .select("DepartmentType", "EmpID", "FirstName", "LastName", "Performance Score")
+)
+
+highest_perf.show()
